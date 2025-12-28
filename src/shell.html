@@ -287,6 +287,53 @@
         }, 20);
 
         function initUI() {
+            // 共通の画像処理関数
+            function processImage(img) {
+                console.log("[JS] Process Image:", img.width, "x", img.height);
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+
+                const imageData = ctx.getImageData(0, 0, img.width, img.height);
+                const data = imageData.data;
+
+                const nDataBytes = data.length * data.BYTES_PER_ELEMENT;
+                const dataPtr = Module._malloc(nDataBytes);
+
+                if (!dataPtr) {
+                    console.error("[JS] Failed to allocate memory");
+                    document.getElementById('status').textContent = "Memory Error!";
+                    return;
+                }
+
+                const dataOnHeap = new Uint8Array(Module.HEAPU8.buffer, dataPtr, nDataBytes);
+                dataOnHeap.set(data);
+
+                if (Module.set_background_image) {
+                    Module.set_background_image(img.width, img.height, dataPtr);
+                    document.getElementById('status').textContent = "Background updated!";
+                }
+
+                Module._free(dataPtr);
+            }
+
+            // デフォルト背景の読み込み
+            const defaultBg = new Image();
+            defaultBg.onload = function () {
+                console.log("[JS] Loading default background...");
+                // 確実に計算セットアップが終わってから画像を渡すため少し待つ
+                setTimeout(() => {
+                    processImage(defaultBg);
+                }, 500);
+            };
+            defaultBg.onerror = function () {
+                console.log("[JS] No default background found (bg.jpg).");
+            };
+            defaultBg.src = 'bg.jpg';
+
+
             // 質量セレクト
             const massSelect = document.getElementById('mass-select');
             massSelect.addEventListener('change', function () {
@@ -323,55 +370,23 @@
 
             // 背景画像アップロード
             const fileInput = document.getElementById('bg-upload');
-
-            function uploadImageToModule(img) {
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                const imageData = ctx.getImageData(0, 0, img.width, img.height);
-                const data = imageData.data;
-                const nDataBytes = data.length * data.BYTES_PER_ELEMENT;
-                const dataPtr = Module._malloc(nDataBytes);
-                if (!dataPtr) return;
-                const dataOnHeap = new Uint8Array(Module.HEAPU8.buffer, dataPtr, nDataBytes);
-                dataOnHeap.set(data);
-                if (Module.set_background_image) {
-                    Module.set_background_image(img.width, img.height, dataPtr);
-                    document.getElementById('status').textContent = "Background updated!";
-                }
-                Module._free(dataPtr);
-            }
-
             fileInput.addEventListener('change', function (e) {
                 const file = e.target.files[0];
                 if (!file) return;
+
+                console.log("[JS] File selected:", file.name);
                 document.getElementById('status').textContent = "Loading image...";
+
                 const reader = new FileReader();
                 reader.onload = function (event) {
                     const img = new Image();
                     img.onload = function () {
-                        uploadImageToModule(img);
+                        processImage(img);
                     };
                     img.src = event.target.result;
                 };
                 reader.readAsDataURL(file);
             });
-
-            // Load default background image (bg.jpg)
-            (function loadDefaultBackground() {
-                const img = new Image();
-                img.crossOrigin = "Anonymous";
-                img.onload = function () {
-                    console.log("Default background loaded.");
-                    uploadImageToModule(img);
-                };
-                img.onerror = function () {
-                    console.log("Default background (bg.jpg) not found. Using procedural starfield.");
-                };
-                img.src = "bg.jpg?" + new Date().getTime();
-            })();
         }
     </script>
     {{{ SCRIPT }}}
