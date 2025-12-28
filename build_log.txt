@@ -1,0 +1,5 @@
+src/main.cpp:227:5: error: use of undeclared identifier 'setup'
+  227 |     setup();
+      |     ^~~~~
+1 error generated.
+emcc: error: ''C:/Users/hiroto yamada/emsdk/upstream/bin\clang.exe' -target wasm32-unknown-emscripten -fignore-exceptions -mllvm -combiner-global-alias-analysis=false -mllvm -enable-emscripten-sjlj -mllvm -disable-lsr '--sysroot=C:\Users\hiroto yamada\emsdk\upstream\emscripten\cache\sysroot' -DEMSCRIPTEN -isystem 'C:\Users\hiroto yamada\emsdk\upstream\emscripten\cache\sysroot\include\SDL2' -Xclang '-iwithsysroot/include\compat' -c src/main.cpp -o 'C:\Users\HIROTO~1\AppData\Local\Temp\emscripten_temp_3lb5kd7x\main.o'' failed (returned 1)

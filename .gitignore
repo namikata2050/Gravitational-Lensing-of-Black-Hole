@@ -1,0 +1,21 @@
+# C++ build artifacts
+*.obj
+*.exe
+*.pdb
+*.ilk
+*.tlog
+*.log
+
+# VS Code
+.vscode/
+
+# Emscripten cache (if any local)
+.emscripten*
+emsdk/
+
+# System
+thumbs.db
+.DS_Store
+
+# Keep build/ folder for GitHub Pages deployment
+!build/

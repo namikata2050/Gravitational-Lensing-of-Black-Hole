@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="ja">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Black Hole Simulation</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            color: #eee;
+            overflow: hidden;
+            /* 全画面表示 */
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1;
+        }
+
+        canvas.emscripten {
+            border: 0px none;
+            background-color: #000;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 300px;
+            padding: 20px;
+            background: rgba(20, 20, 30, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            z-index: 10;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(100, 200, 255, 0.5);
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+            color: #ccc;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+
+        #status {
+            margin-top: 10px;
+            font-size: 0.8rem;
+            color: #88ff88;
+        }
+
+        .hint {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 10px;
+        }
+
+        /* Loading Spinner */
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 20;
+            pointer-events: none;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading">Loading Simulation...</div>
+
+    <div id="canvas-container">
+        <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+    </div>
+
+    <div id="ui-panel">
+        <h1>Black Hole Controls</h1>
+
+        <div class="control-group">
+            <label for="mass-slider">Mass (Schwarzschild Radius): <span id="mass-val">1.0</span></label>
+            <input type="range" id="mass-slider" min="0.1" max="5.0" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+            <label for="dist-slider">Distance (Zoom): <span id="dist-val">15.0</span></label>
+            <input type="range" id="dist-slider" min="2.0" max="50.0" step="1.0" value="15.0">
+        </div>
+
+        <div class="control-group">
+            <label for="bg-upload">Custom Background Image:</label>
+            <input type="file" id="bg-upload" accept="image/*">
+        </div>
+
+        <div id="status">Ready</div>
+
+        <div class="hint">
+            <strong>Controls:</strong><br>
+            Left Click + Drag: Rotate Camera<br>
+            Sliders: Adjust Parameters
+        </div>
+    </div>
+
+    <!-- Emscripten Boilerplate -->
+    <script type='text/javascript'>
+        var Module = {
+            preRun: [],
+            postRun: [function () {
+                document.getElementById('loading').style.display = 'none';
+                initUI();
+            }],
+            print: (function () {
+                return function (text) {
+                    if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+                    console.log(text);
+                };
+            })(),
+            canvas: (function () {
+                var canvas = document.getElementById('canvas');
+                canvas.addEventListener("webglcontextlost", function (e) { alert('WebGL context lost. You will need to reload the page.'); e.preventDefault(); }, false);
+                return canvas;
+            })(),
+            setStatus: function (text) {
+                if (text) console.log('[Status] ' + text);
+            },
+            totalDependencies: 0,
+            monitorRunDependencies: function (left) {
+                this.totalDependencies = Math.max(this.totalDependencies, left);
+            }
+        };
+
+        function initUI() {
+            // 質量スライダー
+            const massSlider = document.getElementById('mass-slider');
+            const massVal = document.getElementById('mass-val');
+
+            massSlider.addEventListener('input', function () {
+                const val = parseFloat(this.value);
+                massVal.textContent = val.toFixed(1);
+                if (Module.set_mass) Module.set_mass(val);
+            });
+
+            // 距離（ズーム）スライダー
+            const distSlider = document.getElementById('dist-slider');
+            const distVal = document.getElementById('dist-val');
+
+            distSlider.addEventListener('input', function () {
+                const val = parseFloat(this.value);
+                distVal.textContent = val.toFixed(1);
+                if (Module.set_dist) Module.set_dist(val);
+            });
+
+            // 背景画像アップロード
+            const fileInput = document.getElementById('bg-upload');
+            fileInput.addEventListener('change', function (e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                console.log("[JS] File selected:", file.name);
+                document.getElementById('status').textContent = "Loading image...";
+
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    const img = new Image();
+                    img.onload = function () {
+                        console.log("[JS] Image loaded:", img.width, "x", img.height);
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+
+                        const imageData = ctx.getImageData(0, 0, img.width, img.height);
+                        const data = imageData.data;
+
+                        const nDataBytes = data.length * data.BYTES_PER_ELEMENT;
+                        const dataPtr = Module._malloc(nDataBytes);
+
+                        if (!dataPtr) {
+                            console.error("[JS] Failed to allocate memory");
+                            document.getElementById('status').textContent = "Memory Error!";
+                            return;
+                        }
+
+                        const dataOnHeap = new Uint8Array(Module.HEAPU8.buffer, dataPtr, nDataBytes);
+                        dataOnHeap.set(data);
+
+                        if (Module.set_background_image) {
+                            console.log("[JS] Calling set_background_image...");
+                            Module.set_background_image(img.width, img.height, dataPtr);
+                            document.getElementById('status').textContent = "Background updated!";
+                        } else {
+                            console.error("[JS] Module.set_background_image is not defined");
+                        }
+
+                        Module._free(dataPtr);
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+    </script>
+    <script async type="text/javascript" src="index.js"></script>
+</body>
+
+</html>

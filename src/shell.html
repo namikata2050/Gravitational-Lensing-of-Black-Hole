@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en-us">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ブラックホール重力レンズシミュレーター - Event Horizon</title>
+    <meta name="description" content="ブラウザで動くリアルタイムブラックホールシミュレーター。一般相対性理論に基づく重力レンズ効果を体験できます。ブラックホールによる光の歪みを観察しましょう。">
+    <meta name="keywords"
+        content="重力レンズ効果, ブラックホール, シミュレーター, 相対性理論, 宇宙, 物理, WebAssembly, Gravitational Lensing, Black Hole">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="ブラックホール重力レンズシミュレーター">
+    <meta property="og:description" content="重力レンズ効果をブラウザで体験。">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #00f7ff;
+            --bg-color: #050505;
+            --panel-bg: rgba(10, 10, 15, 0.85);
+            --text-color: #eee;
+            --text-muted: #aaa;
+            --accent-color: #ff0055;
+            --glass-border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 70vw;
+            height: 70vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1;
+            background: black;
+            border-radius: 20px;
+            box-shadow: 0 0 50px rgba(79, 172, 254, 0.2);
+            overflow: hidden;
+        }
+
+        canvas.emscripten {
+            border: 0px none;
+            background-color: #000;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        #ui-panel {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            width: 320px;
+            padding: 25px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            z-index: 10;
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.4rem;
+            margin-top: 0;
+            margin-bottom: 20px;
+            background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(79, 172, 254, 0.3);
+            letter-spacing: 1px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        select,
+        input[type="range"],
+        input[type="file"] {
+            width: 100%;
+            box-sizing: border-box;
+            /* appearance: none; fixes lint */
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        select {
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            color: white;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            cursor: pointer;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 10px rgba(0, 242, 254, 0.5);
+        }
+
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+        }
+
+        #status {
+            margin-top: 15px;
+            font-size: 0.8rem;
+            color: var(--primary-color);
+            min-height: 1.2em;
+            font-family: 'Orbitron', monospace;
+        }
+
+        .hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 25px;
+            border-top: 1px solid var(--glass-border);
+            padding-top: 15px;
+            line-height: 1.5;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 20;
+            pointer-events: none;
+            font-family: 'Orbitron', sans-serif;
+            text-align: center;
+        }
+
+        #loading-text {
+            font-size: 2rem;
+            color: var(--primary-color);
+            text-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+        }
+
+        #dots {
+            display: inline-block;
+            width: 3ch;
+            text-align: left;
+        }
+
+        .progress-container {
+            width: 300px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 0 auto;
+        }
+
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background: var(--primary-color);
+            box-shadow: 0 0 10px var(--primary-color);
+            transition: width 0.1s linear;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading">
+        <div id="loading-text">Initial Calculation<span id="dots"></span></div>
+        <div class="progress-container">
+            <div id="progress-bar" class="progress-bar"></div>
+        </div>
+    </div>
+    <div id="canvas-container">
+        <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+    </div>
+    <div id="ui-panel">
+        <h1>EVENT HORIZON</h1>
+        <div class="control-group">
+            <label for="mass-select">Mass (Schwarzschild Radius):</label>
+            <select id="mass-select">
+                <option value="0.1">0.1 (Micro)</option>
+                <option value="0.5">0.5 (Small)</option>
+                <option value="1.0">1.0 (Medium)</option>
+                <option value="2.0">2.0 (Large)</option>
+                <option value="4.0" selected>4.0 (Massive)</option>
+                <option value="8.0">8.0 (Super Massive)</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label for="dist-slider">Distance (Zoom): <span id="dist-val">30.0</span></label>
+            <input type="range" id="dist-slider" min="2.0" max="50.0" step="0.5" value="30.0">
+        </div>
+        <div class="control-group">
+            <label for="bg-upload">Upload Background:</label>
+            <input type="file" id="bg-upload" accept="image/*">
+        </div>
+        <div id="status">Ready</div>
+        <div class="hint">
+            <strong>Controls:</strong><br>
+            Left Click + Drag: Rotate Camera
+        </div>
+    </div>
+
+    <!-- About Section Removed -->
+
+    <script type='text/javascript'>
+        var Module = {
+            preRun: [],
+            postRun: [function () {
+                document.getElementById('loading').style.display = 'none';
+                initUI();
+            }],
+            canvas: (function () {
+                var canvas = document.getElementById('canvas');
+                canvas.addEventListener("webglcontextlost", function (e) { alert('WebGL context lost. You will need to reload the page.'); e.preventDefault(); }, false);
+                return canvas;
+            })(),
+            setStatus: function (text) {
+                if (text) {
+                    const st = document.getElementById('status');
+                    if (st) st.textContent = text;
+                }
+            }
+        };
+
+        // Dot animation
+        let dotCount = 0;
+        setInterval(() => {
+            const dots = document.getElementById('dots');
+            if (dots) {
+                dotCount = (dotCount + 1) % 4;
+                dots.textContent = '.'.repeat(dotCount);
+            }
+        }, 20);
+
+        function initUI() {
+            // 質量セレクト
+            const massSelect = document.getElementById('mass-select');
+            massSelect.addEventListener('change', function () {
+                const val = parseFloat(this.value);
+                if (Module.set_mass) {
+                    document.getElementById('status').textContent = "Recalculating...";
+                    // 描画更新を少し待ってUIの描画を反映させる(setTimeout)
+                    setTimeout(() => {
+                        Module.set_mass(val);
+                        document.getElementById('status').textContent = "Ready";
+                    }, 10);
+                }
+            });
+
+            // 距離（ズーム）スライダー
+            const distSlider = document.getElementById('dist-slider');
+            const distVal = document.getElementById('dist-val');
+            // 事前計算は重いので change イベント推奨。
+            distSlider.addEventListener('change', function () {
+                const val = parseFloat(this.value);
+                distVal.textContent = val.toFixed(1);
+                if (Module.set_dist) {
+                    document.getElementById('status').textContent = "Recalculating...";
+                    setTimeout(() => {
+                        Module.set_dist(val);
+                        document.getElementById('status').textContent = "Ready";
+                    }, 10);
+                }
+            });
+            // 表示更新用
+            distSlider.addEventListener('input', function () {
+                distVal.textContent = parseFloat(this.value).toFixed(1);
+            });
+
+            // 背景画像アップロード
+            const fileInput = document.getElementById('bg-upload');
+
+            function uploadImageToModule(img) {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                const imageData = ctx.getImageData(0, 0, img.width, img.height);
+                const data = imageData.data;
+                const nDataBytes = data.length * data.BYTES_PER_ELEMENT;
+                const dataPtr = Module._malloc(nDataBytes);
+                if (!dataPtr) return;
+                const dataOnHeap = new Uint8Array(Module.HEAPU8.buffer, dataPtr, nDataBytes);
+                dataOnHeap.set(data);
+                if (Module.set_background_image) {
+                    Module.set_background_image(img.width, img.height, dataPtr);
+                    document.getElementById('status').textContent = "Background updated!";
+                }
+                Module._free(dataPtr);
+            }
+
+            fileInput.addEventListener('change', function (e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                document.getElementById('status').textContent = "Loading image...";
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    const img = new Image();
+                    img.onload = function () {
+                        uploadImageToModule(img);
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+
+            // Load default background image (bg.jpg)
+            (function loadDefaultBackground() {
+                const img = new Image();
+                img.crossOrigin = "Anonymous";
+                img.onload = function () {
+                    console.log("Default background loaded.");
+                    uploadImageToModule(img);
+                };
+                img.onerror = function () {
+                    console.log("Default background (bg.jpg) not found. Using procedural starfield.");
+                };
+                img.src = "bg.jpg?" + new Date().getTime();
+            })();
+        }
+    </script>
+    {{{ SCRIPT }}}
+</body>
+
+</html>
