@@ -386,12 +386,6 @@
                 };
                 reader.readAsDataURL(file);
             });
-        };
-        img.onerror = function () {
-            console.log("Default background (bg.jpg) not found. Using procedural starfield.");
-        };
-        img.src = "bg.jpg?" + new Date().getTime();
-            }) ();
         }
     </script>
     <script async type="text/javascript" src="bh_sim.js"></script>
