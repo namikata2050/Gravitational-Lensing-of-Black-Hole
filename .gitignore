@@ -17,5 +17,6 @@ emsdk/
 thumbs.db
 .DS_Store
 
-# Keep build/ folder for GitHub Pages deployment
+# Keep build/ and docs/ folder for GitHub Pages deployment
 !build/
+!docs/
